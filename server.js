@@ -35,8 +35,11 @@ const uploadComp = multer({
   }
 });
 
-// ─── API KEY ──────────────────────────────────────────────────────────────────
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+// ─── VARIABLES DE ENTORNO ─────────────────────────────────────────────────────
+const ANTHROPIC_API_KEY       = process.env.ANTHROPIC_API_KEY;
+const META_VERIFY_TOKEN       = process.env.META_VERIFY_TOKEN || "mexarato2026";
+const META_PAGE_ACCESS_TOKEN  = process.env.META_PAGE_ACCESS_TOKEN;
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 // ─────────────────────────────────────────────────────────────────────────────
 
 function fotosDisponibles(producto) {
@@ -254,6 +257,95 @@ SITIO WEB: mexarato.com.mx`;
 
 const sesiones = new Map();
 
+// ─── WEBHOOK META — VERIFICACIÓN GET ─────────────────────────────────────────
+app.get("/webhook", (req, res) => {
+  const mode      = req.query["hub.mode"];
+  const token     = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  console.log("📡 Verificación webhook recibida:", { mode, token });
+
+  if (mode === "subscribe" && token === META_VERIFY_TOKEN) {
+    console.log("✅ Webhook verificado correctamente");
+    res.status(200).send(challenge);
+  } else {
+    console.error("❌ Token de verificación incorrecto");
+    res.sendStatus(403);
+  }
+});
+
+// ─── WEBHOOK META — RECEPCIÓN DE MENSAJES POST ───────────────────────────────
+app.post("/webhook", async (req, res) => {
+  res.sendStatus(200); // Responder rápido para que Meta no reintente
+
+  const body = req.body;
+  if (body.object !== "whatsapp_business_account") return;
+
+  for (const entry of body.entry || []) {
+    for (const change of entry.changes || []) {
+      const value = change.value;
+      if (!value.messages) continue;
+
+      for (const msg of value.messages) {
+        if (msg.type !== "text") continue;
+
+        const from    = msg.from;
+        const texto   = msg.text.body;
+        const sid     = `wa_${from}`;
+
+        console.log(`📨 WhatsApp de ${from}: ${texto}`);
+
+        // Procesar con MEXABOT
+        if (!sesiones.has(sid)) sesiones.set(sid, []);
+        const hist = sesiones.get(sid);
+        hist.push({ role: "user", content: texto });
+
+        try {
+          const aiResp = await axios.post(
+            "https://api.anthropic.com/v1/messages",
+            { model: "claude-sonnet-4-6", max_tokens: 1000, system: SYSTEM_PROMPT, messages: hist },
+            { headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" } }
+          );
+
+          const reply = aiResp.data.content[0].text;
+          hist.push({ role: "assistant", content: reply });
+          if (hist.length > 60) sesiones.set(sid, hist.slice(-60));
+
+          const limpio = reply
+            .replace("[PEDIDO_LISTO]", "")
+            .replace("[ESCALAR_ASESOR]", "")
+            .replace(/\[FOTO:[\w-]+\]/g, "")
+            .replace("[CATALOGO]", "")
+            .trim();
+
+          // Enviar respuesta por WhatsApp
+          await axios.post(
+            `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+            {
+              messaging_product: "whatsapp",
+              to: from,
+              type: "text",
+              text: { body: limpio }
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${META_PAGE_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+              }
+            }
+          );
+
+          console.log(`✅ Respuesta enviada a ${from}`);
+
+        } catch (e) {
+          console.error("❌ Error procesando mensaje WhatsApp:", e.response?.data || e.message);
+        }
+      }
+    }
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.post("/chat", async (req, res) => {
   const { mensaje, sessionId, esNueva } = req.body;
   const sid = sessionId || "default";
@@ -324,7 +416,7 @@ app.post("/reset", (req,res) => {
   res.json({ ok:true });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("");
   console.log("🌮 MEXABOT v4 corriendo en http://localhost:" + PORT);
