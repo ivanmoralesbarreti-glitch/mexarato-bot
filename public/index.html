@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEXARATO — MEXABOT Simulador</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0ebe3; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    #app { display: flex; gap: 16px; width: 100%; max-width: 960px; height: 680px; }
+    #sidebar { width: 210px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+    .logo { background: #603514; color: #EAD0B2; border-radius: 12px; padding: 14px 16px; text-align: center; flex-shrink: 0; }
+    .logo .brand { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+    .logo .sub { font-size: 11px; opacity: .7; margin-top: 2px; }
+    .card { background: #fff; border-radius: 12px; padding: 14px; flex-shrink: 0; }
+    .slabel { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #999; margin-bottom: 8px; font-weight: 600; }
+    .sbtn { width: 100%; text-align: left; padding: 8px 10px; font-size: 12px; border-radius: 8px; border: 1px solid #e8e2d9; background: #faf7f3; color: #555; cursor: pointer; line-height: 1.4; margin-bottom: 4px; transition: all .15s; }
+    .sbtn:hover { background: #f0e8dc; border-color: #603514; color: #603514; }
+    .sbtn.danger { border-color: #f5c4c4; color: #c0392b; background: #fff5f5; }
+    select { width: 100%; font-size: 12px; padding: 7px 9px; border-radius: 8px; border: 1px solid #e8e2d9; background: #faf7f3; color: #555; margin-bottom: 5px; }
+    #chat-panel { flex: 1; display: flex; flex-direction: column; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,.08); }
+    #chat-header { padding: 13px 18px; background: #603514; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+    .av { width: 34px; height: 34px; border-radius: 50%; background: #EAD0B2; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #603514; flex-shrink: 0; }
+    .hname { font-size: 14px; font-weight: 600; color: #EAD0B2; }
+    .hst { font-size: 11px; color: #c9a882; }
+    #cbadge { margin-left: auto; font-size: 11px; padding: 3px 10px; border-radius: 20px; background: rgba(255,255,255,.15); color: #EAD0B2; }
+    #msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: #f7f3ee; }
+    .msg { max-width: 82%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .bot { background: #fff; color: #333; border-radius: 4px 14px 14px 14px; align-self: flex-start; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .usr { background: #603514; color: #EAD0B2; border-radius: 14px 4px 14px 14px; align-self: flex-end; }
+    .snote { background: #fff8e7; border: 1px solid #f5d98b; color: #8a6d00; font-size: 12px; align-self: center; border-radius: 8px; max-width: 96%; text-align: center; padding: 7px 12px; }
+    .notif-ok   { background: #eafaf1; border: 1px solid #82e0aa; color: #1a7a43; border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.5; }
+    .notif-warn { background: #fff8e7; border: 1px solid #f5d98b; color: #8a6d00; border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.5; }
+    .notif-err  { background: #fdecea; border: 1px solid #f5a9a2; color: #c0392b; border-radius: 10px; padding: 10px 14px; font-size: 13px; }
+    .fotos-grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; align-self: flex-start; max-width: 90%; }
+    .fotos-grid img { width: 120px; height: 120px; object-fit: cover; border-radius: 10px; border: 2px solid #e8e2d9; cursor: pointer; transition: transform .15s; }
+    .fotos-grid img:hover { transform: scale(1.05); }
+    .catalogo-link { background: #fff; border: 1px solid #603514; border-radius: 10px; padding: 10px 14px; font-size: 13px; align-self: flex-start; }
+    .catalogo-link a { color: #603514; text-decoration: none; font-weight: 600; }
+    .catalogo-link a:hover { text-decoration: underline; }
+    .file-msg { background: #eaf3ff; border: 1px solid #b3d4f5; color: #1a4a7a; border-radius: 10px; padding: 10px 14px; font-size: 13px; align-self: flex-end; max-width: 82%; }
+    .tdots { display: flex; gap: 5px; align-items: center; padding: 2px 0; }
+    .tdots span { width: 8px; height: 8px; border-radius: 50%; background: #bbb; animation: bl 1.2s infinite; }
+    .tdots span:nth-child(2){animation-delay:.2s} .tdots span:nth-child(3){animation-delay:.4s}
+    @keyframes bl{0%,80%,100%{opacity:.2}40%{opacity:1}}
+    #foot { padding: 10px 14px; border-top: 1px solid #ede8e1; background: #fff; flex-shrink: 0; }
+    #input-row { display: flex; gap: 8px; align-items: center; }
+    #inp { flex: 1; font-size: 14px; padding: 10px 14px; border-radius: 10px; border: 1px solid #ddd; outline: none; }
+    #inp:focus { border-color: #603514; }
+    #sbtn { padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; background: #603514; color: #EAD0B2; border: none; cursor: pointer; }
+    #sbtn:hover { background: #4e2910; }
+    #sbtn:disabled { opacity: .45; cursor: default; }
+    #file-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    #file-input { display: none; }
+    .file-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; border: 1px dashed #603514; color: #603514; background: #faf7f3; cursor: pointer; white-space: nowrap; }
+    #file-name { font-size: 12px; color: #aaa; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #upload-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; background: #2e7d32; color: #fff; border: none; cursor: pointer; display: none; white-space: nowrap; }
+    /* Lightbox */
+    #lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 999; align-items: center; justify-content: center; }
+    #lightbox.show { display: flex; }
+    #lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+    #lightbox-close { position: fixed; top: 20px; right: 24px; font-size: 32px; color: #fff; cursor: pointer; line-height: 1; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="logo">
+      <div class="brand">MEXARATO</div>
+      <div class="sub">MEXABOT Simulador</div>
+    </div>
+    <div class="card">
+      <div class="slabel">Escenarios</div>
+      <button class="sbtn" onclick="cargar('Hola, vi su publicidad en Instagram')">👋 Cliente nuevo</button>
+      <button class="sbtn" onclick="cargar('Está muy caro para mí')">💸 Objeción precio</button>
+      <button class="sbtn" onclick="cargar('Quiero surtir mi tienda con Churritos y Cubitos')">📦 Mayoreo</button>
+      <button class="sbtn" onclick="cargar('Me puedes mostrar fotos de los Cubitos?')">📷 Pedir fotos</button>
+      <button class="sbtn" onclick="cargar('Puedes enviarme el catálogo de productos?')">📄 Pedir catálogo</button>
+      <button class="sbtn" onclick="cargar('Qué sabores tienen de obleas?')">🍪 Sabores</button>
+      <button class="sbtn" onclick="cargar('Cuánto tarda en llegar el pedido?')">🚚 Tiempos envío</button>
+      <button class="sbtn" onclick="cargar('No puedo depositar en BBVA')">💳 Alt. Mercado Pago</button>
+      <button class="sbtn" onclick="cargar('Quiero hablar con un asesor')">🙋 Pedir asesor</button>
+      <button class="sbtn" onclick="cargar('Me llevo 100 Cubitos de chocolate')">✅ Cerrar pedido</button>
+    </div>
+    <div class="card">
+      <div class="slabel">Canal simulado</div>
+      <select id="canal" onchange="document.getElementById('cbadge').textContent=this.value">
+        <option>WhatsApp</option>
+        <option>Instagram DM</option>
+        <option>Messenger</option>
+        <option>Sitio web</option>
+      </select>
+      <button class="sbtn danger" onclick="resetChat()">↺ Nueva conversación</button>
+    </div>
+  </div>
+
+  <div id="chat-panel">
+    <div id="chat-header">
+      <div class="av">MB</div>
+      <div>
+        <div class="hname">MEXABOT</div>
+        <div class="hst">● En línea — MEXARATO</div>
+      </div>
+      <div id="cbadge">WhatsApp</div>
+    </div>
+    <div id="msgs"></div>
+    <div id="foot">
+      <div id="input-row">
+        <input type="text" id="inp" placeholder="Escribe tu mensaje..." onkeydown="if(event.key==='Enter')enviar()"/>
+        <button id="sbtn" onclick="enviar()">Enviar</button>
+      </div>
+      <div id="file-row">
+        <label class="file-btn" for="file-input">📎 Adjuntar comprobante</label>
+        <input type="file" id="file-input" accept="image/*,.pdf" onchange="archivoSeleccionado(this)"/>
+        <span id="file-name">Foto o PDF del pago</span>
+        <button id="upload-btn" onclick="subirComprobante()">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox para ver fotos grandes -->
+<div id="lightbox" onclick="cerrarLightbox()">
+  <span id="lightbox-close">✕</span>
+  <img id="lightbox-img" src="" alt="Foto producto"/>
+</div>
+
+<script>
+  const sessionId = 'sess_' + Math.random().toString(36).slice(2);
+  let archivoActual = null;
+
+  function scroll(){ const m = document.getElementById('msgs'); m.scrollTop = m.scrollHeight; }
+
+  function addMsg(txt, cls){
+    const d = document.createElement('div');
+    d.className = 'msg ' + cls;
+    d.textContent = txt;
+    document.getElementById('msgs').appendChild(d);
+    scroll();
+    return d;
+  }
+
+  function addNote(txt){
+    const d = document.createElement('div');
+    d.className = 'snote';
+    d.textContent = txt;
+    document.getElementById('msgs').appendChild(d);
+    scroll();
+  }
+
+  function addDiv(cls, html){
+    const d = document.createElement('div');
+    d.className = cls;
+    d.innerHTML = html;
+    document.getElementById('msgs').appendChild(d);
+    scroll();
+  }
+
+  function addFotos(fotos){
+    if(!fotos || fotos.length === 0) return;
+    const grid = document.createElement('div');
+    grid.className = 'fotos-grid';
+    fotos.forEach(url => {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Producto MEXARATO';
+      img.onclick = () => abrirLightbox(url);
+      grid.appendChild(img);
+    });
+    document.getElementById('msgs').appendChild(grid);
+    scroll();
+  }
+
+  function addCatalogo(url){
+    if(!url) return;
+    const d = document.createElement('div');
+    d.className = 'catalogo-link';
+    d.innerHTML = '📄 <a href="' + url + '" target="_blank">Ver catálogo MEXARATO (PDF)</a>';
+    document.getElementById('msgs').appendChild(d);
+    scroll();
+  }
+
+  function abrirLightbox(url){
+    document.getElementById('lightbox-img').src = url;
+    document.getElementById('lightbox').classList.add('show');
+  }
+  function cerrarLightbox(){
+    document.getElementById('lightbox').classList.remove('show');
+  }
+
+  function showTyping(){
+    const d = document.createElement('div');
+    d.className = 'msg bot';
+    d.id = 'typing';
+    d.innerHTML = '<div class="tdots"><span></span><span></span><span></span></div>';
+    document.getElementById('msgs').appendChild(d);
+    scroll();
+    return d;
+  }
+
+  function cargar(txt){
+    document.getElementById('inp').value = txt;
+    document.getElementById('inp').focus();
+  }
+
+  function archivoSeleccionado(input){
+    if(input.files && input.files[0]){
+      archivoActual = input.files[0];
+      document.getElementById('file-name').textContent = archivoActual.name;
+      document.getElementById('upload-btn').style.display = 'inline-block';
+    }
+  }
+
+  async function subirComprobante(){
+    if(!archivoActual) return;
+    const formData = new FormData();
+    formData.append('comprobante', archivoActual);
+    formData.append('sessionId', sessionId);
+    addDiv('file-msg', '📎 Enviando: ' + archivoActual.name + '...');
+    try {
+      const res = await fetch('/subir-comprobante', { method: 'POST', body: formData });
+      const data = await res.json();
+      if(data.ok){
+        addMsg(data.mensaje, 'bot');
+        addDiv('notif-ok', '✅ Comprobante guardado en el servidor: ' + data.archivo);
+      } else {
+        addDiv('notif-err', '⚠️ Error: ' + (data.error || 'No se pudo subir'));
+      }
+    } catch(e){
+      addDiv('notif-err', '⚠️ Error: ' + e.message);
+    }
+    archivoActual = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-name').textContent = 'Foto o PDF del pago';
+    document.getElementById('upload-btn').style.display = 'none';
+  }
+
+  async function resetChat(){
+    await fetch('/reset', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({sessionId}) });
+    document.getElementById('msgs').innerHTML = '';
+    await iniciarConversacion();
+  }
+
+  async function iniciarConversacion(){
+    const typing = showTyping();
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mensaje: '', sessionId, esNueva: true })
+      });
+      const data = await res.json();
+      typing.remove();
+      if(data.respuesta) addMsg(data.respuesta, 'bot');
+    } catch(e){
+      typing.remove();
+      addMsg('¡Hola! Soy MEXABOT de MEXARATO 🌾 ¿En qué te puedo ayudar?', 'bot');
+    }
+  }
+
+  async function enviar(){
+    const inp = document.getElementById('inp');
+    const btn = document.getElementById('sbtn');
+    const txt = inp.value.trim();
+    if(!txt || btn.disabled) return;
+    inp.value = '';
+    btn.disabled = true;
+    addMsg(txt, 'usr');
+    const typing = showTyping();
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mensaje: txt, sessionId })
+      });
+      const data = await res.json();
+      typing.remove();
+      if(data.error){
+        addDiv('notif-err', '⚠️ <strong>Error:</strong> ' + data.error);
+      } else {
+        addMsg(data.respuesta, 'bot');
+        if(data.fotos && data.fotos.length > 0) addFotos(data.fotos);
+        else if(data.fotos && data.fotos.length === 0) addNote('📷 Fotos no cargadas aún — agrega imágenes a la carpeta productos/');
+        if(data.catalogoUrl) addCatalogo(data.catalogoUrl);
+        else if(data.catalogoUrl === null && txt.toLowerCase().includes('catálogo')) addNote('📄 Catálogo no encontrado — agrega el PDF a la carpeta catalogo/');
+        if(data.pedidoListo) addDiv('notif-ok', '📲 <strong>¡Pedido listo!</strong><br>En producción tu WhatsApp recibe nombre, dirección, productos y aviso de comprobante.');
+        if(data.escalarAsesor) addDiv('notif-warn', '🚨 <strong>Escalado a asesor</strong><br>En producción recibes notificación en tu WhatsApp.');
+      }
+    } catch(e){
+      typing.remove();
+      addDiv('notif-err', '⚠️ Error: ' + e.message);
+    }
+    btn.disabled = false;
+    inp.focus();
+  }
+
+  iniciarConversacion();
+</script>
+</body>
+</html>

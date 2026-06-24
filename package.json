@@ -1,0 +1,14 @@
+{
+  "name": "mexarato-tester",
+  "version": "2.0.0",
+  "description": "Simulador local del chatbot MEXABOT de MEXARATO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "express": "^4.19.0",
+    "multer": "^1.4.5-lts.1"
+  }
+}
