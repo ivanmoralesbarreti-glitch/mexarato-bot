@@ -36,7 +36,7 @@ const uploadComp = multer({
 });
 
 // ─── API KEY ──────────────────────────────────────────────────────────────────
-const ANTHROPIC_API_KEY = "ANTHROPIC_KEY_HERE";
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 // ─────────────────────────────────────────────────────────────────────────────
 
 function fotosDisponibles(producto) {
