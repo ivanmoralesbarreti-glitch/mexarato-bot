@@ -196,7 +196,7 @@ Opción 2 — Mercado Pago (si no puede en BBVA):
   👤 Beneficiario: Vanessa Morales Barreto
   🏦 Institución: Mercado Pago W
 
-Siempre pedir captura/comprobante. También pueden enviarlo al WhatsApp: 735-128-2512
+Siempre pedir captura/comprobante. También pueden enviarlo al WhatsApp: 735-218-2512
 
 ══════════════════════════════════════════
 PAQUETE BIENVENIDA — $699
@@ -253,7 +253,15 @@ PERSUASIÓN
 - Si duda por precio: Paquete Bienvenida $699 o descuento primera compra
 - Siempre termina con una pregunta
 
-SITIO WEB: mexarato.com.mx`;
+SITIO WEB: mexarato.com.mx
+
+══════════════════════════════════════════
+MENCIONAR SITIO WEB
+══════════════════════════════════════════
+Menciona mexarato.com.mx proactivamente en estos momentos:
+- Al cerrar un pedido: "También puedes ver todos nuestros productos en mexarato.com.mx"
+- Cuando el cliente pregunte por más productos o sabores
+- Al despedirte: "Recuerda que puedes visitar mexarato.com.mx para ver toda nuestra línea"`;
 
 const sesiones = new Map();
 
@@ -287,12 +295,71 @@ app.post("/webhook", async (req, res) => {
       if (!value.messages) continue;
 
       for (const msg of value.messages) {
+
+        const from = msg.from;
+        const sid  = `wa_${from}`;
+
+        // ── Manejo de imágenes ──────────────────────────────────────────────
+        if (msg.type === "image") {
+          const imageId = msg.image?.id;
+          console.log(`🖼️ Imagen recibida de ${from}: ${imageId}`);
+
+          const waHeaders = { Authorization: `Bearer ${META_PAGE_ACCESS_TOKEN}`, "Content-Type": "application/json" };
+          const waUrl = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+          const ASESOR = "527352182512";
+
+          // Preguntar al cliente si es comprobante
+          await axios.post(waUrl, {
+            messaging_product: "whatsapp", to: from, type: "text",
+            text: { body: "📎 Recibí tu imagen. ¿Es tu *comprobante de pago*? Responde *SÍ* para confirmar o *NO* si es otra cosa." }
+          }, { headers: waHeaders });
+
+          // Guardar imagen pendiente en sesión
+          if (!sesiones.has(sid)) sesiones.set(sid, []);
+          sesiones.get(sid).push({ role: "user", content: "[IMAGEN_ENVIADA]", imageId });
+
+          continue;
+        }
+
+        // ── Manejo de respuesta SÍ/NO a imagen ────────────────────────────
+        if (msg.type === "text") {
+          const histCheck = sesiones.get(sid) || [];
+          const ultimoMsg = histCheck[histCheck.length - 1];
+          if (ultimoMsg?.content === "[IMAGEN_ENVIADA]") {
+            const respuesta = msg.text.body.trim().toUpperCase();
+            const waHeaders = { Authorization: `Bearer ${META_PAGE_ACCESS_TOKEN}`, "Content-Type": "application/json" };
+            const waUrl = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+            const ASESOR = "527352182512";
+
+            if (respuesta.includes("SÍ") || respuesta.includes("SI") || respuesta.includes("S")) {
+              // Es comprobante — notificar al asesor
+              await axios.post(waUrl, {
+                messaging_product: "whatsapp", to: from, type: "text",
+                text: { body: "✅ ¡Comprobante recibido! Verificamos tu pago y confirmamos tu pedido en breve 🎉" }
+              }, { headers: waHeaders });
+
+              await axios.post(waUrl, {
+                messaging_product: "whatsapp", to: ASESOR, type: "text",
+                text: { body: `💳 *COMPROBANTE DE PAGO RECIBIDO* — MEXABOT\n\nCliente: wa.me/${from}\nRevisa el comprobante y confirma el pedido.` }
+              }, { headers: waHeaders });
+
+              // Limpiar imagen pendiente del historial
+              histCheck.pop();
+              console.log(`💳 Comprobante de ${from} notificado al asesor`);
+            } else {
+              await axios.post(waUrl, {
+                messaging_product: "whatsapp", to: from, type: "text",
+                text: { body: "Entendido 😊 ¿En qué te puedo ayudar?" }
+              }, { headers: waHeaders });
+              histCheck.pop();
+            }
+            continue;
+          }
+        }
+
         if (msg.type !== "text") continue;
 
-        const from    = msg.from;
-        const texto   = msg.text.body;
-        const sid     = `wa_${from}`;
-
+        const texto = msg.text.body;
         console.log(`📨 WhatsApp de ${from}: ${texto}`);
 
         // Procesar con MEXABOT
@@ -309,7 +376,7 @@ app.post("/webhook", async (req, res) => {
 
           const reply = aiResp.data.content[0].text;
           hist.push({ role: "assistant", content: reply });
-          if (hist.length > 60) sesiones.set(sid, hist.slice(-60));
+          if (hist.length > 100) sesiones.set(sid, hist.slice(-100));
 
           const BASE_URL = "https://mexarato-bot-production.up.railway.app";
 
@@ -344,9 +411,16 @@ app.post("/webhook", async (req, res) => {
 
           // Notificar al asesor si hay pedido listo
           if (pedidoListo) {
-            const msgPedido = `🛒 *PEDIDO LISTO* — MEXABOT\n\nCliente: wa.me/${from}\nRevisa la conversación y confirma el pedido.`;
+            // Extraer resumen de la conversación (últimos 10 mensajes)
+            const histReciente = hist.slice(-10);
+            const resumenConv = histReciente
+              .filter(m => m.role === "user" || m.role === "assistant")
+              .map(m => `${m.role === "user" ? "👤 Cliente" : "🤖 Bot"}: ${m.content.substring(0, 200)}`)
+              .join("\n");
+
+            const msgPedido = `🛒 *NUEVO PEDIDO LISTO* — MEXABOT\n\n📱 Cliente: wa.me/${from}\n\n📋 *Resumen de conversación:*\n${resumenConv}\n\n✅ Confirma el pedido y verifica el comprobante de pago.`;
             await axios.post(waUrl, { messaging_product: "whatsapp", to: ASESOR, type: "text", text: { body: msgPedido } }, { headers: waHeaders });
-            console.log(`🛒 Notificación de pedido enviada al asesor`);
+            console.log(`🛒 Notificación de pedido con resumen enviada al asesor`);
           }
 
           // Notificar al asesor si hay escalada
@@ -403,7 +477,7 @@ app.post("/chat", async (req, res) => {
 
     const reply = response.data.content[0].text;
     hist.push({ role:"assistant", content:reply });
-    if(hist.length > 60) sesiones.set(sid, hist.slice(-60));
+    if(hist.length > 100) sesiones.set(sid, hist.slice(-100));
 
     const pedidoListo   = reply.includes("[PEDIDO_LISTO]");
     const escalarAsesor = reply.includes("[ESCALAR_ASESOR]");
