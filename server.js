@@ -320,6 +320,9 @@ app.post("/webhook", async (req, res) => {
           const pedidoCatalogo = reply.includes("[CATALOGO]");
           const catalogoUrl = pedidoCatalogo ? catalogoDisponible() : null;
 
+          const pedidoListo   = reply.includes("[PEDIDO_LISTO]");
+          const escalarAsesor = reply.includes("[ESCALAR_ASESOR]");
+
           const limpio = reply
             .replace("[PEDIDO_LISTO]", "")
             .replace("[ESCALAR_ASESOR]", "")
@@ -332,11 +335,26 @@ app.post("/webhook", async (req, res) => {
             "Content-Type": "application/json"
           };
           const waUrl = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+          const ASESOR = "527352182512";
 
           const enviarWA = (payload) => axios.post(waUrl, { messaging_product: "whatsapp", to: from, ...payload }, { headers: waHeaders });
 
           // Enviar texto
           await enviarWA({ type: "text", text: { body: limpio } });
+
+          // Notificar al asesor si hay pedido listo
+          if (pedidoListo) {
+            const msgPedido = `🛒 *PEDIDO LISTO* — MEXABOT\n\nCliente: wa.me/${from}\nRevisa la conversación y confirma el pedido.`;
+            await axios.post(waUrl, { messaging_product: "whatsapp", to: ASESOR, type: "text", text: { body: msgPedido } }, { headers: waHeaders });
+            console.log(`🛒 Notificación de pedido enviada al asesor`);
+          }
+
+          // Notificar al asesor si hay escalada
+          if (escalarAsesor) {
+            const msgEscalar = `⚠️ *CLIENTE NECESITA ASESOR* — MEXABOT\n\nCliente: wa.me/${from}\nEl cliente solicitó hablar con un asesor.`;
+            await axios.post(waUrl, { messaging_product: "whatsapp", to: ASESOR, type: "text", text: { body: msgEscalar } }, { headers: waHeaders });
+            console.log(`⚠️ Notificación de escalada enviada al asesor`);
+          }
 
           // Enviar fotos (máx 5)
           if (fotos.length > 0) {
