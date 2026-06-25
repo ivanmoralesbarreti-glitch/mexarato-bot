@@ -311,6 +311,15 @@ app.post("/webhook", async (req, res) => {
           hist.push({ role: "assistant", content: reply });
           if (hist.length > 60) sesiones.set(sid, hist.slice(-60));
 
+          const BASE_URL = "https://mexarato-bot-production.up.railway.app";
+
+          // Detectar fotos y catálogo
+          const fotoMatch = reply.match(/\[FOTO:([\w-]+)\]/);
+          const fotoProducto = fotoMatch ? fotoMatch[1] : null;
+          const fotos = fotoProducto ? fotosDisponibles(fotoProducto) : [];
+          const pedidoCatalogo = reply.includes("[CATALOGO]");
+          const catalogoUrl = pedidoCatalogo ? catalogoDisponible() : null;
+
           const limpio = reply
             .replace("[PEDIDO_LISTO]", "")
             .replace("[ESCALAR_ASESOR]", "")
@@ -318,22 +327,31 @@ app.post("/webhook", async (req, res) => {
             .replace("[CATALOGO]", "")
             .trim();
 
-          // Enviar respuesta por WhatsApp
-          await axios.post(
-            `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
-            {
-              messaging_product: "whatsapp",
-              to: from,
-              type: "text",
-              text: { body: limpio }
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${META_PAGE_ACCESS_TOKEN}`,
-                "Content-Type": "application/json"
-              }
+          const waHeaders = {
+            Authorization: `Bearer ${META_PAGE_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+          };
+          const waUrl = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+          const enviarWA = (payload) => axios.post(waUrl, { messaging_product: "whatsapp", to: from, ...payload }, { headers: waHeaders });
+
+          // Enviar texto
+          await enviarWA({ type: "text", text: { body: limpio } });
+
+          // Enviar fotos (máx 5)
+          if (fotos.length > 0) {
+            const fotosEnviar = fotos.slice(0, 5);
+            for (const foto of fotosEnviar) {
+              await enviarWA({ type: "image", image: { link: `${BASE_URL}${foto}` } });
             }
-          );
+            console.log(`📸 ${fotosEnviar.length} fotos enviadas a ${from}`);
+          }
+
+          // Enviar catálogo como documento
+          if (catalogoUrl) {
+            await enviarWA({ type: "document", document: { link: `${BASE_URL}${catalogoUrl}`, filename: "Catalogo_MEXARATO.pdf" } });
+            console.log(`📄 Catálogo enviado a ${from}`);
+          }
 
           console.log(`✅ Respuesta enviada a ${from}`);
 
